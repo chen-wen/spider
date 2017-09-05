@@ -40,7 +40,7 @@ class Dianping extends Spider{
 
     public function handle($data, $response)
     {
-
+        logger($data);
     }
 
     public function terminal($data, $response)

@@ -1,7 +1,7 @@
 <?php 
 namespace Wayne\Spider;
 
-use QL\QueryList;
+use GuzzleHttp\Client as GuzzleHttp;
 
 abstract class Spider {
 
@@ -40,14 +40,12 @@ abstract class Spider {
     {
         $config = config('spider.http');
         $selector = array('title'=>['h2 a','text'],'link'=>['h2 a','href']);
-        $config = config('spider.http', []);
-        collect($this->startup)->each(function ($url) use ($config) {
-            $config['url'] = $config['referrer'] = $url;
-            $query = QueryList::run('Request', $config)
-                    ->setQuery($selector)
-                    ->getData();
-            $data = $this->handle($query->data, $query->html);
-            $this->terminal($data, $query->html);
+        $client = new GuzzleHttp;
+        collect($this->startup)->each(function ($url) use ($client) {
+            $response = $client->get($url);
+            
+            $data = $this->handle($response, $response);
+            $this->terminal($response, $response);
         });
     }
 
