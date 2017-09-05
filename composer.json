@@ -1,0 +1,16 @@
+{
+    "name": "wayne/spider",
+    "description": "yet another spider library.",
+    "type": "library",
+    "require": {
+        "jaeger/querylist": "^3.2",
+        "jaeger/querylist-ext-request": "^1.0",
+        "atrox/matcher": "^1.1"
+    },
+    "authors": [
+        {
+            "name": "陈文",
+            "email": "master@chenwen.name"
+        }
+    ]
+}
