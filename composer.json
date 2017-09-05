@@ -3,9 +3,9 @@
     "description": "yet another spider library.",
     "type": "library",
     "require": {
-        "jaeger/querylist": "^3.2",
-        "jaeger/querylist-ext-request": "^1.0",
-        "atrox/matcher": "^1.1"
+        "guzzlehttp/guzzle": "~6.0",
+        "atrox/matcher": "^1.1",
+        "jclyons52/php-query": "^1.3"
     },
     "authors": [
         {
