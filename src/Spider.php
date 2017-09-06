@@ -4,6 +4,8 @@ namespace Wayne\Spider;
 use Atrox\Matcher;
 use Jclyons52\PHPQuery\Document;
 use GuzzleHttp\Client as GuzzleHttp;
+use GuzzleHttp\Cookie\CookieJar;
+use GuzzleHttp\Cookie\SetCookie;
 
 abstract class Spider {
 
@@ -11,12 +13,19 @@ abstract class Spider {
 
     protected $inputEncodeing = null;
 
+    protected $done = true;
+
     protected $startup = [];
 
     public function __construct()
     {
         $this->setup();
     }
+
+
+    abstract public function getSchema();
+
+    abstract public function getPageGenerator();
 
     public function is($name)
     {
@@ -33,23 +42,35 @@ abstract class Spider {
         // todo something
     }
 
-    protected function parseDescription($description)
-    {
-        $description = $this->getSchema();
-    }
-
     public function run()
     {
-        $client = new GuzzleHttp;
-        collect($this->startup)->each(function ($url) use ($client) {
-            $html = file_get_contents($url);
-            // $response = $client->get($url);
-            // $html = $response->getBody();
-            $this->inputEncodeing = $this->getEncode($html);
-            $data = $this->parseDocument($html, $this->getSchema());
-            $data = $this->handle($data, $html);
-            $this->terminal($data, $html);
-        });
+        $cookies = SetCookie::fromString(config('spider.cookie'));
+        $config = [
+            'headers' => config('spider.headers', []),
+            'cookie'  => new CookieJar(false, $cookies),
+        ];
+        $client = new GuzzleHttp($config);
+
+        $handle = function ($url) use ($client) {
+            try {
+                $response = $client->get($url);
+                $html = $response->getBody();
+                $this->inputEncodeing = $this->getEncode($html);
+                $data = $this->parseDocument($html, $this->getSchema());
+                $data = $this->handle($data, $html);
+                $this->terminal($data, $html);
+            } catch(\Exception $e) {
+                $this->error($e, $url);
+            }
+        };
+
+        if (!empty($this->startup)) {
+            collect($this->startup)->each($handle);
+        }
+
+        while ($url = $this->getPageGenerator()) {
+            $handle($url);
+        }
     }
 
     private function getEncode($string)
@@ -82,6 +103,10 @@ abstract class Spider {
 
     protected function parseCss($html, $selector, $all = false)
     {
+        if (!$html) {
+            return null;
+        }
+
         $html = method_exists($html, 'toString') ? $html->toString() : strval($html);
         $html = '<meta charset="'.$this->inputEncodeing.'"/>'.$html;
         $dom = new Document($html);
@@ -91,7 +116,7 @@ abstract class Spider {
             return null;
         }
         if ($option['method'] == 'attr') {
-            return $query->{$option['method']}($option['attr']);
+            return $query->{$option['method']}($option['attribute']);
         } elseif ($option['method'] === 'text') {
             return $query->text();
         } else {
@@ -101,11 +126,19 @@ abstract class Spider {
 
     protected function parseXpath($html, $xpath, $all = false)
     {
+        if (!$html) {
+            return null;
+        }
+
         $m = Matcher::single($xpath)->fromHtml();
         return $m($html);
     }
     protected function parseRegex($html, $regex, $all = false)
     {
+        if (!$html) {
+            return null;
+        }
+
         if ($all) {
             preg_match_all($regex, $html, $matches);
             return $matches;
@@ -175,7 +208,10 @@ abstract class Spider {
         // todo something
     }
 
-    abstract public function getSchema();
-
-    abstract public function getPageGenerator();
+    protected function error($e, $url) 
+    {
+        logger($url);
+        logger($e);
+        $this->done = true;
+    }
 }

@@ -2,13 +2,35 @@
 namespace Wayne\Spider\Spiders;
 
 use Wayne\Spider\Spider;
+use Redis;
 
 class DianpingList extends Spider{
     
-    protected $name = 'dianping-startup';
+    protected $name = 'dianping-list';
+
     protected $startup = [
-        'http://www.dianping.com/search/category/2/35/g2926',
+        // 'http://www.dianping.com/search/category/2/35/g2926',
     ];
+
+    public function setup()
+    {
+
+    }
+
+    public function getPageGenerator()
+    {
+        static $index = 1;
+        static $page = '';
+        if ($this->done) {
+            $index = 1;
+            $page = Redis::spop($this->name);
+            if (!$page) {
+                return false;
+            }
+            $this->done = false;
+        }
+        return $page .'p' . $index ++;
+    }
 
     public function getSchema()
     {
@@ -16,13 +38,13 @@ class DianpingList extends Spider{
             'name'=> 'list',
             'data'=>'collection',       // collection|json|array|string|integer
             'type'=>'css',  // css|xpath|regex
-            'expression'=>'#shop-all-list li::html()',
+            'expression'=>'#shop-all-list li',
             'items' => [
                 [
                     'name'=>'name',
                     'data'=>'string',
                     'type'=>'css',
-                    'expression'=>'.tit h4',
+                    'expression'=>'.tit h4::text()',
                 ],
                 [
                     'name' => 'comment',
@@ -34,24 +56,16 @@ class DianpingList extends Spider{
         ];
     }
 
-    public function setup()
-    {
-        
-    }
-
-    public function getPageGenerator()
-    {
-        return null;
-    }
-
     public function handle($data, $response)
     {
-        logger($data);
         return $data;
     }
 
     public function terminal($data, $response)
     {
-
+        if (count($data['list']) < 15) {
+            $this->done = true;
+        }
+        logger($data);
     }
 }
