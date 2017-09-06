@@ -3,29 +3,32 @@ namespace Wayne\Spider\Spiders;
 
 use Wayne\Spider\Spider;
 
-class Dianping extends Spider{
+class DianpingList extends Spider{
     
     protected $name = 'dianping-startup';
+    protected $startup = [
+        'http://www.dianping.com/search/category/2/35/g2926',
+    ];
 
-    public function getDescription()
+    public function getSchema()
     {
         return [
             'name'=> 'list',
-            'data'=>'collection|json|array|string|integer',
-            'type'=>'css|xpath|regex',
-            'expression'=>'collection',
+            'data'=>'collection',       // collection|json|array|string|integer
+            'type'=>'css',  // css|xpath|regex
+            'expression'=>'#shop-all-list li::html()',
             'items' => [
                 [
                     'name'=>'name',
                     'data'=>'string',
-                    'type'=>'css|xpath|regex',
-                    'expression'=>'collection',
+                    'type'=>'css',
+                    'expression'=>'.tit h4',
                 ],
                 [
-                    'name' => 'address',
+                    'name' => 'comment',
                     'data'=>'integer',
-                    'type'=>'css|xpath|regex',
-                    'expression'=>'collection',
+                    'type'=>'css',
+                    'expression'=>'.review-num b',
                 ],
             ],
         ];
@@ -43,7 +46,8 @@ class Dianping extends Spider{
 
     public function handle($data, $response)
     {
-        logger($data->getBody());
+        logger($data);
+        return $data;
     }
 
     public function terminal($data, $response)

@@ -9,9 +9,9 @@ abstract class Spider {
 
     protected $name = 'default';
 
-    protected $startup = [
-        'http://www.dianping.com/search/category/2/35/g2926',
-    ];
+    protected $inputEncodeing = null;
+
+    protected $startup = [];
 
     public function __construct()
     {
@@ -35,59 +35,131 @@ abstract class Spider {
 
     protected function parseDescription($description)
     {
-        $description = $this->getDescription();
+        $description = $this->getSchema();
     }
 
     public function run()
     {
-        $config = config('spider.http');
-        $selector = array('title'=>['h2 a','text'],'link'=>['h2 a','href']);
         $client = new GuzzleHttp;
         collect($this->startup)->each(function ($url) use ($client) {
-            $response = $client->get($url);
-            $html = $response->getBody();
-            $dom = new Document($html);
-            // echo $response;
-            
-            $data = $this->handle($response, $response);
-            $this->terminal($response, $response);
+            $html = file_get_contents($url);
+            // $response = $client->get($url);
+            // $html = $response->getBody();
+            $this->inputEncodeing = $this->getEncode($html);
+            $data = $this->parseDocument($html, $this->getSchema());
+            $data = $this->handle($data, $html);
+            $this->terminal($data, $html);
         });
     }
 
-    protected parseData($dom, $desc)
+    private function getEncode($string)
+    {
+        return mb_detect_encoding($string, array('ASCII', 'GB2312', 'GBK', 'UTF-8'));
+    }
+
+    protected function parseSelector($selector) {
+        $return = [
+            'method' => null,
+            'selector' => null,
+            'attribute' => null,
+        ];
+        $reg = '/^(.+?)(::([a-z]+)(\(([a-z\-]+)?\))?)?$/';
+        preg_match($reg, $selector, $matches);
+        $count = count($matches);
+        if($count == 2){
+            $return['selector'] = $matches[1];
+            $return['method'] = 'text';
+        } else if($count == 4 || $count == 5){
+            $return['selector'] = $matches[1];
+            $return['method'] = $matches[3];
+        } else if($count == 6){
+            $return['selector'] = $matches[1];
+            $return['method'] = $matches[3];
+            $return['attribute'] = $matches[5];
+        }
+        return $return;
+    }
+
+    protected function parseCss($html, $selector, $all = false)
+    {
+        $html = method_exists($html, 'toString') ? $html->toString() : strval($html);
+        $html = '<meta charset="'.$this->inputEncodeing.'"/>'.$html;
+        $dom = new Document($html);
+        $option = $this->parseSelector($selector);
+        $query = $all ? $dom->querySelectorAll($option['selector']) : $dom->querySelector($option['selector']);
+        if (!$query) {
+            return null;
+        }
+        if ($option['method'] == 'attr') {
+            return $query->{$option['method']}($option['attr']);
+        } elseif ($option['method'] === 'text') {
+            return $query->text();
+        } else {
+            return $all ? $query : $query->toString();
+        }
+    }
+
+    protected function parseXpath($html, $xpath, $all = false)
+    {
+        $m = Matcher::single($xpath)->fromHtml();
+        return $m($html);
+    }
+    protected function parseRegex($html, $regex, $all = false)
+    {
+        if ($all) {
+            preg_match_all($regex, $html, $matches);
+            return $matches;
+        } else {
+            preg_match($regex, $html, $matches);
+            return count($matches) > 1 ? $matches[1] : null;
+        }
+    }
+
+    protected function parseDocument($dom, $schema)
     {
         $return = [];
-        if (!array_key_exists('name', $desc)) {
-            foreach($desc as $field){
-                $return += $this->parseData($dom, $field);
+        if (!array_key_exists('name', $schema)) {
+            foreach($schema as $field){
+                $return += $this->parseDocument($dom, $field);
             }
             return $return;
         }
 
-        $name  = $desc['name'];
-        $method = 'parse'.ucfirst($desc['type']);
-        switch ($desc['data']) {
+        $name  = $schema['name'];
+        $method = 'parse'.ucfirst($schema['type']);
+        switch ($schema['data']) {
             case 'collection':
-                $list = $this->{$method}($dom, $desc['expression']);
+                $expression = ends_with($schema['expression'], '::html()') 
+                    ? $schema['expression'] : $schema['expression'].'::html()'; 
+                $list = $this->{$method}($dom, $expression, true);
                 foreach($list as $item){
-                    $return[$name][] =  $this->parseData($item, $desc['items']);
+                    $return[$name][] =  $this->parseDocument($item, $schema['items']);
                 }
                 break;
             case 'json':
-                $wrapper = $this->{$method}($dom, $desc['expression']);
-                $return[$name] =  $this->parseData($wrapper, $desc['items']);
+                if ($schema['type'] !== 'regex') {
+                    $expression = ends_with($schema['expression'], '::html()') 
+                        ? $schema['expression'] : $schema['expression'].'::html()';
+                    $wrapper = $this->{$method}($dom, $expression, true);
+                    $return[$name] = $this->parseDocument($wrapper, $schema['items']);
+                } else {
+                    $content = $this->{$method}($dom, $schema['expression']);
+                    $return[$name] = $content;
+                    $array = json_decode($return[$name], true);
+                    if (is_array($array)) {
+                        $return[$name] = $array;
+                    }
+                }
                 break;
             case 'array':
-                # code...
-                $return[$name] =  $this->{$method}($dom, $desc['expression']);
+                $return[$name] =  $this->{$method}($dom, $schema['expression'], true);
                 break;
             case 'inter':
-                $return[$name] =  $this->{$method}($dom, $desc['expression']);
-                # code...
+                $return[$name] = (int) $this->{$method}($dom, $schema['expression']);
                 break;
             case 'string':
             default:
-                $return[$name] =  $this->{$method}($dom, $desc['expression']);
+                $return[$name] =  $this->{$method}($dom, $schema['expression']);
                 break;
         }
         return $return;
@@ -103,7 +175,7 @@ abstract class Spider {
         // todo something
     }
 
-    abstract public function getDescription();
+    abstract public function getSchema();
 
     abstract public function getPageGenerator();
 }
