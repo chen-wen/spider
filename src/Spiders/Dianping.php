@@ -10,16 +10,19 @@ class Dianping extends Spider{
     public function getDescription()
     {
         return [
-            'data'=>'collection|object|array',
+            'name'=> 'list',
+            'data'=>'collection|json|array|string|integer',
             'type'=>'css|xpath|regex',
             'expression'=>'collection',
             'items' => [
-                'name' => [
+                [
+                    'name'=>'name',
                     'data'=>'string',
                     'type'=>'css|xpath|regex',
                     'expression'=>'collection',
                 ],
-                'address' => [
+                [
+                    'name' => 'address',
                     'data'=>'integer',
                     'type'=>'css|xpath|regex',
                     'expression'=>'collection',
@@ -40,7 +43,7 @@ class Dianping extends Spider{
 
     public function handle($data, $response)
     {
-        logger($data);
+        logger($data->getBody());
     }
 
     public function terminal($data, $response)
