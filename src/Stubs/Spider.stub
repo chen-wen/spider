@@ -1,34 +1,27 @@
 <?php 
-namespace Wayne\Spider\Spiders;
+namespace DummyNamespace;
 
 use Wayne\Spider\Spider;
 
-class DianpingDetail extends Spider{
+class DummyClassName extends Spider{
     
-    protected $name = 'dianping-detail';
+    protected $name = 'DummyName';
     protected $startup = [
-        'https://zhuanlan.zhihu.com/p/27784974'
     ];
 
     public function getSchema()
     {
         return [
             'name'=> 'detail',
-            'data'=>'json',       // collection|json|array|string|integer
+            'data'=>'collection',       // collection|json|array|string|integer
             'type'=>'css',  // css|xpath|regex
-            'expression'=>'html::html()',
+            'expression'=>'html',
             'items' => [
                 [
                     'name'=>'name',
                     'data'=>'string',
                     'type'=>'css',
                     'expression'=>'title',
-                ],
-                [
-                    'name' => 'config',
-                    'data'=>'json',
-                    'type'=>'regex',
-                    'expression'=>'/<textarea id="clientConfig" hidden>([\s\S]*?)<\/textarea>/',
                 ],
             ],
         ];
